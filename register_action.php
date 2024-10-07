@@ -1,4 +1,6 @@
 <?php
+session_start(); // Start session to store messages
+
 $servername = "localhost";
 $username = "root";
 $password = "";
@@ -15,22 +17,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $contact_no = $conn->real_escape_string($_POST['contact_no']);
     $address = $conn->real_escape_string($_POST['address']);
 
-    $result = $conn->query("SELECT * FROM users WHERE email='$email'");
+    // Check if email already exists
+    $stmt = $conn->prepare("SELECT * FROM users WHERE email=?");
+    $stmt->bind_param("s", $email);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
     if ($result->num_rows > 0) {
-        echo "Email already registered!";
+        $_SESSION['error'] = "Email already registered!";
+        header("Location: registration.php");
+        exit();
     } elseif ($password !== $confirm_password) {
-        echo "Passwords do not match!";
+        $_SESSION['error'] = "Passwords do not match!";
+        header("Location: registration.php");
+        exit();
     } else {
         $hashed_password = password_hash($password, PASSWORD_DEFAULT);
-        $sql = "INSERT INTO users (username, email, password, contact_no, address) VALUES ('$username', '$email', '$hashed_password', '$contact_no', '$address')";
+        $stmt = $conn->prepare("INSERT INTO users (username, email, password, contact_no, address) VALUES (?, ?, ?, ?, ?)");
+        $stmt->bind_param("sssss", $username, $email, $hashed_password, $contact_no, $address);
         
-        if ($conn->query($sql) === TRUE) {
-            $userId = $conn->insert_id;
+        if ($stmt->execute()) {
+            $userId = $stmt->insert_id;
+            $stmt->close(); // Close previous statement
             $conn->query("INSERT INTO audit_log (user_id, action) VALUES ('$userId', 'User registered')");
-            header("Location: index.php");
+
+            // Set success message
+            $_SESSION['message'] = "Registration successful! Please log in with your new account."; // Updated message
+            header("Location: login.php"); // Redirect to login page
             exit();
         } else {
-            echo "Error: " . $sql . "<br>" . $conn->error;
+            $_SESSION['error'] = "Error: " . $conn->error;
+            header("Location: registration.php");
+            exit();
         }
     }
 }

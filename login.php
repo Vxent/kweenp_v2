@@ -7,6 +7,14 @@ require 'db_connection.php'; // Adjust the path as needed
 // Initialize an error message variable
 $error = '';
 
+// Check for success message
+$successMessage = isset($_SESSION['message']) ? $_SESSION['message'] : '';
+
+// Unset the message after displaying it
+if (isset($_SESSION['message'])) {
+    unset($_SESSION['message']);
+}
+
 // Check if the form is submitted
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     // Get the email and password from the form submission
@@ -14,7 +22,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $password = $_POST['password'];
 
     // Prepare and execute a query to find the user
-    $stmt = $db->prepare("SELECT id, password FROM users WHERE email = ?");
+    $stmt = $db->prepare("SELECT id, password, role FROM users WHERE email = ?"); // Include role
     $stmt->bind_param("s", $email);
     $stmt->execute();
     $result = $stmt->get_result();
@@ -27,7 +35,16 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         if (password_verify($password, $user['password'])) {
             // Password is correct
             $_SESSION['user_id'] = $user['id']; // Set session variable
-            header('Location: index.php'); // Redirect to homepage
+            $_SESSION['user_role'] = $user['role']; // Set user role
+            
+            // Redirect based on user role
+            if ($_SESSION['user_role'] === 'admin') {
+                header('Location: adminDashboard.php'); // Redirect to admin dashboard
+            } else {
+                // Use the redirect parameter if available
+                $redirect_url = $_GET['redirect'] ?? 'index.php'; // Default to homepage if no redirect is set
+                header("Location: $redirect_url");
+            }
             exit();
         } else {
             // Handle invalid password
@@ -49,6 +66,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     <link rel="stylesheet" href="style.css">
 </head>
 <style>
+/* Your existing CSS styles here */
 body {
     display: flex;
     flex-direction: column;
@@ -91,7 +109,6 @@ nav ul {
 
 nav ul li {
     margin: 0 15px;
-    
 }
 
 nav ul li a {
@@ -176,6 +193,11 @@ a:hover {
     color: red;
     margin-top: 10px;
 }
+
+.success {
+    color: green;
+    margin-top: 10px;
+}
 </style>
 <body style="background-image: url('http://www.pixelstalk.net/wp-content/uploads/2016/10/Black-and-Orange-Background-Full-HD.jpg'); background-size: cover; background-repeat: no-repeat;">
 
@@ -196,7 +218,6 @@ a:hover {
     <div class="container">
         <img src="images/logo.png" alt="" width="200px" style="padding-bottom: 10px;">
       
-    
         <form action="" method="POST">
             <label for="email">Your Email Address:</label>
             <input type="email" id="email" name="email" placeholder="Enter your email" required>
@@ -206,6 +227,11 @@ a:hover {
         </form>
 
         <a onclick="window.location.href='registration.php'"><p>REGISTER</p></a>
+
+        <?php if ($successMessage): ?>
+            <p class="success"><?php echo $successMessage; ?></p>
+        <?php endif; ?>
+
         <?php if ($error): ?>
             <p class="error"><?php echo $error; ?></p>
         <?php endif; ?>

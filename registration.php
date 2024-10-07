@@ -1,3 +1,38 @@
+<?php
+session_start(); // Start session to access error messages
+include 'db_connection.php'; // Include your database connection
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $username = $db->real_escape_string($_POST['username']);
+    $email = $db->real_escape_string($_POST['email']);
+    $password = $_POST['password'];
+    $confirm_password = $_POST['confirm_password'];
+    $contact_no = $db->real_escape_string($_POST['contact_no']);
+    $address = $db->real_escape_string($_POST['address']);
+
+    // Check if email is already registered
+    $result = $db->query("SELECT * FROM users WHERE email='$email'");
+    if ($result->num_rows > 0) {
+        $_SESSION['error'] = "Email already registered!";
+    } elseif ($password !== $confirm_password) {
+        $_SESSION['error'] = "Passwords do not match!";
+    } else {
+        $hashed_password = password_hash($password, PASSWORD_DEFAULT);
+        $sql = "INSERT INTO users (username, email, password, contact_no, address) VALUES ('$username', '$email', '$hashed_password', '$contact_no', '$address')";
+        
+        if ($db->query($sql) === TRUE) {
+            $userId = $db->insert_id;
+            $_SESSION['username'] = $username; // Store username in session
+            $db->query("INSERT INTO audit_log (user_id, action) VALUES ('$userId', 'User registered')");
+            header("Location: index.php");
+            exit();
+        } else {
+            $_SESSION['error'] = "Error: " . $db->error;
+        }
+    }
+}
+?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -17,14 +52,14 @@
         }
 
         .container {
-    background: rgba(0, 0, 0, 0.7); /* Semi-transparent background */
-    backdrop-filter: blur(10px); /* Apply blur effect */
-    padding: 40px;
-    border-radius: 15px;
-    box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
-    text-align: center;
-    width: 400px;
-}
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(10px);
+            padding: 40px;
+            border-radius: 15px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+            text-align: center;
+            width: 400px;
+        }
 
         h1 {
             margin-bottom: 30px;
@@ -88,10 +123,16 @@
         }
     </style>
 </head>
-<body  style="background-image: url(http://www.pixelstalk.net/wp-content/uploads/2016/10/Black-and-Orange-Background-Full-HD.jpg); background-size: cover; background-repeat: no-repeat;" >
+<body style="background-image: url('http://www.pixelstalk.net/wp-content/uploads/2016/10/Black-and-Orange-Background-Full-HD.jpg'); background-size: cover; background-repeat: no-repeat;">
     <div class="container">
         <h1>Register</h1>
-        <form action="register_action.php" method="POST">
+        
+        <?php if (isset($_SESSION['error'])): ?>
+            <p class="error"><?php echo $_SESSION['error']; ?></p>
+            <?php unset($_SESSION['error']); // Clear the error after displaying ?>
+        <?php endif; ?>
+
+        <form action="registration.php" method="POST">
             <label for="username">Username:</label>
             <input type="text" id="username" name="username" required>
             <label for="email">Email:</label>

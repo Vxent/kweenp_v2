@@ -3,40 +3,45 @@ session_start();
 include 'db_connection.php'; // Ensure this points to your db_connection.php
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+    // Get the email and password from the form submission
     $email = $_POST['email'];
     $password = $_POST['password'];
 
-    // Prepare and execute your SQL query using $db
-    $stmt = $db->prepare("SELECT id, password FROM users WHERE email = ?");
+    // Prepare and execute your SQL query to find the user
+    $stmt = $db->prepare("SELECT id, password, role FROM users WHERE email = ?");
     $stmt->bind_param("s", $email);
     $stmt->execute();
     $result = $stmt->get_result();
 
+    // Check if the user exists
     if ($result->num_rows > 0) {
         $row = $result->fetch_assoc();
+        // Verify the password
         if (password_verify($password, $row['password'])) {
-            $_SESSION['user_id'] = $row['id'];
+            // Password is correct
+            $_SESSION['user_id'] = $row['id']; // Set session variable for user ID
+            $_SESSION['user_role'] = $row['role']; // Set session variable for user role
+
             // Redirect based on user role
-            if ($email == 'admin@example.com') {
+            if ($_SESSION['user_role'] === 'admin') {
                 header('Location: adminDashboard.php'); // Redirect to admin dashboard
             } else {
                 header('Location: index.php'); // Redirect to homepage for regular users
             }
             exit();
         } else {
-            // Handle incorrect password
+            // Handle invalid password
+            $_SESSION['error'] = 'Incorrect password. Please try again.';
+            header('Location: login.php'); // Redirect back to login
+            exit();
         }
     } else {
         // Handle user not found
+        $_SESSION['error'] = 'User not found. Please register or try again.';
+        header('Location: login.php'); // Redirect back to login
+        exit();
     }
-}
 
-if ($isAdmin) { // You need to define how to check if the user is admin
-    $_SESSION['user_role'] = 'admin'; // Set user role to admin
-    header('Location: adminDashboard.php'); // Redirect to admin dashboard
-} else {
-    $_SESSION['user_role'] = 'user'; // Or whatever role the user has
-    header('Location: index.php'); // Redirect to homepage
+    $stmt->close(); // Close the statement
 }
-
 ?>
